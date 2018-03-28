@@ -4,7 +4,6 @@
   "description": "Chrome Extension to fetch and display GitHub repo traffic",
   "dependencies": {
     "axios": "^0.17.1",
-    "babel-cli": "^6.26.0",
     "babel-loader": "^7.1.4",
     "babel-plugin-transform-async-to-generator": "^6.24.1",
     "babel-plugin-transform-runtime": "^6.23.0",
@@ -14,7 +13,7 @@
     "webpack": "^3.11.0"
   },
   "scripts": {
-    "build": "babel src/background.js -o dist/background.js && webpack"
+    "build": "webpack"
   },
   "author": "Jonathan Taylor",
   "license": "MIT",

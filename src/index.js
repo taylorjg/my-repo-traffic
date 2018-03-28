@@ -38,9 +38,6 @@ const chunksOf = (n, xs) =>
     .map(i => [i * n, i * n + n])
     .map(([start, end]) => xs.slice(start, end));
 
-const delay = ms =>
-  new Promise(resolve => setTimeout(resolve, ms));
-
 const scrapeGitHubLogin = async () => {
   const response = await axios.get("https://github.com");
   const matches = response.data.match(/<meta name="user-login" content="([^"]+)">/);
@@ -59,7 +56,8 @@ const GITHUB_API_CONFIG = {
 const GITHUB_WEB_CONFIG = {
   headers: {
     "Accept": "application/json"
-  }
+  },
+  withCredentials: true
 };
 
 const asyncWrapper = async () => {
@@ -67,21 +65,22 @@ const asyncWrapper = async () => {
     const login = await scrapeGitHubLogin();
     console.log(`login: ${login}`);
 
-    const reposUrl = `https://api.github.com/users/${login}/repos`;
-    const repos = flatten(await getPages(reposUrl, GITHUB_API_CONFIG));
+    const MAX_NUM_REPOS = 149;
+
+    const reposUrl = `https://api.github.com/users/${login}/repos?sort=created&direction=desc`;
+    const repos = flatten(await getPages(reposUrl, GITHUB_API_CONFIG)).slice(0, MAX_NUM_REPOS);
     console.log(`repos.length: ${repos.length}`);
 
     const results = [];
 
-    const BATCH_SIZE = 1;
-    const DELAY = 400;
+    const BATCH_SIZE = MAX_NUM_REPOS;
     const repoChunks = chunksOf(BATCH_SIZE, repos);
 
-    for (let i = 0; i < repoChunks.length; i++) {
-      const repoChunk = repoChunks[i];
+    for (let chunkIndex = 0; chunkIndex < repoChunks.length; chunkIndex++) {
+      const repoChunk = repoChunks[chunkIndex];
       const chunkPromises = [];
-      for (let j = 0; j < repoChunk.length; j++) {
-        const repo = repoChunk[j];
+      for (let repoIndex = 0; repoIndex < repoChunk.length; repoIndex++) {
+        const repo = repoChunk[repoIndex];
         const viewsUrl = `https://github.com/${repo.full_name}/graphs/traffic-data`;
         const clonesUrl = `https://github.com/${repo.full_name}/graphs/clone-activity-data`;
         const repoPromise = Promise.resolve(repo);
@@ -90,7 +89,7 @@ const asyncWrapper = async () => {
         const repoPromises = Promise.all([repoPromise, viewsPromise, clonesPromise]);
         chunkPromises.push(repoPromises);
       }
-      console.log(`waiting for chunk index ${i} of ${repoChunks.length}...`);
+      console.log(`waiting for all repo promises within chunk ${chunkIndex + 1} of ${repoChunks.length}...`);
       const chunkResponses = await Promise.all(chunkPromises);
       chunkResponses.forEach(([repo, { data: views }, { data: clones }]) => {
         const result = {
@@ -100,14 +99,12 @@ const asyncWrapper = async () => {
         };
         results.push(result);
       });
-      console.log(`delaying for ${DELAY}ms...`);
-      await delay(DELAY);
     }
     console.log(`results.length: ${results.length}`);
 
     const compareResults = (a, b) => {
-      const compareViewsCount = b.views.count - a.views.count;
-      const compareClonesCount = b.clones.count - a.clones.count;
+      const compareViewsCount = b.views.summary.total - a.views.summary.total;
+      const compareClonesCount = b.clones.summary.total - a.clones.summary.total;
       return compareViewsCount ? compareViewsCount : compareClonesCount;
     };
 

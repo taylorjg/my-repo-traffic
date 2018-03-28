@@ -1,15 +1,17 @@
 /* eslint-env node */
-const path = require('path');
 
-const dist = path.join(__dirname, 'dist');
+const path = require("path");
+
+const dist = path.join(__dirname, "dist");
 
 module.exports = {
-    entry: [
-        './src/index.js'
-    ],
+    entry: {
+        "index": "./src/index.js",
+        "background": "./src/background.js"
+    },
     output: {
         path: dist,
-        filename: 'bundle.js',
+        filename: "[name].js",
     },
     module: {
         rules: [
@@ -19,6 +21,5 @@ module.exports = {
                 use: 'babel-loader'
             }
         ]
-    },
-    devtool: 'source-map',
+    }
 };

@@ -27,89 +27,69 @@ const getPages = async (url, config) => {
   }
 };
 
-// const handleError = err => {
-//   if (err.response) {
-//     const response = err.response;
-//     const request = response.request;
-//     const status = response.status;
-//     const statusText = response.statusText;
-//     if (response.data && response.data.message) {
-//       console.log(`[${request.method} ${request.path}] status: ${status}; statusText: ${statusText}; message: ${response.data.message}`);
-//     }
-//     else {
-//       console.log(`[${request.method} ${request.path}] status: ${status}; statusText: ${statusText}; err: ${err}`);
-//     }
-//   }
-//   else {
-//     if (err.config) {
-//       console.log(`[${err.config.method} ${err.config.url}] err: ${err}`);
-//     }
-//     else {
-//       console.log(`err: ${err}`);
-//     }
-//   }
-// };
-
 const flatten = xs => [].concat(...xs);
 
-const getLogin = async () => {
+const scrapeGitHubLogin = async () => {
   const response = await axios.get("https://github.com");
   const matches = response.data.match(/<meta name="user-login" content="([^"]+)">/);
   return matches[1].trim();
 };
 
+const GITHUB_API_CONFIG = {
+  params: {
+    "per_page": 100
+  },
+  headers: {
+    "Accept": "application/vnd.github.v3+json"
+  }
+};
+
+const GITHUB_WEB_CONFIG = {
+  headers: {
+    "Accept": "application/json"
+  }
+};
+
 const asyncWrapper = async () => {
   try {
-    const login = await getLogin();
+    const login = await scrapeGitHubLogin();
     console.log(`login: ${login}`);
 
-    const url1 = `https://api.github.com/users/${login}/repos`;
-    const config1 = {
-      params: {
-        "per_page": 100
-      },
-      headers: {
-        "Accept": "application/vnd.github.v3+json"
-      }
-    };
-    const repos = flatten(await getPages(url1, config1));
+    const reposUrl = `https://api.github.com/users/${login}/repos`;
+    const repos = flatten(await getPages(reposUrl, GITHUB_API_CONFIG)).slice(0, 20);
     console.log(`repos.length: ${repos.length}`);
 
-    const repo = repos[0];
-    const urlViews = `https://github.com/${repo.full_name}/graphs/traffic-data`;
-    const urlClones = `https://github.com/${repo.full_name}/graphs/clone-activity-data`;
-    const config2 = {
-      headers: {
-        "Accept": "application/json"
+    // const repo = repos[0];
+    // const viewsUrl = `https://github.com/${repo.full_name}/graphs/traffic-data`;
+    // const clonesUrl = `https://github.com/${repo.full_name}/graphs/clone-activity-data`;
+    // const viewsResponse = await axios.get(viewsUrl, GITHUB_WEB_CONFIG);
+    // const clonesResponse = await axios.get(clonesUrl, GITHUB_WEB_CONFIG);
+    // console.log(`views: ${JSON.stringify(viewsResponse.data, null, 2)}`);
+    // console.log(`clones: ${JSON.stringify(clonesResponse.data, null, 2)}`);
+
+    const results = [];
+    for (let index = 0; index < repos.length; index++) {
+      try {
+        const repo = repos[index];
+        const viewsUrl = `https://github.com/${repo.full_name}/graphs/traffic-data`;
+        const clonesUrl = `https://github.com/${repo.full_name}/graphs/clone-activity-data`;
+        const viewsPromise = axios.get(viewsUrl, GITHUB_WEB_CONFIG);
+        const clonesPromise = axios.get(clonesUrl, GITHUB_WEB_CONFIG);
+        const [{ data: views }, { data: clones }] = await Promise.all([viewsPromise, clonesPromise]);
+
+        const result = {
+          repo,
+          views,
+          clones
+        };
+
+        results.push(result);
       }
-    };
-
-    const responseViews = await axios.get(urlViews, config2);
-    console.log(`views: ${JSON.stringify(responseViews.data, null, 2)}`);
-
-    const responseClones = await axios.get(urlClones, config2);
-    console.log(`clones: ${JSON.stringify(responseClones.data, null, 2)}`);
-
-    // const results = [];
-    // for (let index = 0; index < repos.length; index++) {
-    //   try {
-    //     const repo = repos[index];
-    //     const viewsPromise = axios.get(`/repos/${repo.owner.login}/${repo.name}/traffic/views`);
-    //     const clonesPromise = axios.get(`/repos/${repo.owner.login}/${repo.name}/traffic/clones`);
-    //     const [{ data: views }, { data: clones }] = await Promise.all([viewsPromise, clonesPromise]);
-
-    //     const result = {
-    //       repo,
-    //       views,
-    //       clones
-    //     };
-
-    //     results.push(result);
-    //   }
-    //   catch (err) {
-    //     console.log(`err: ${err}`);
-    //   }
-    // }
+      catch (err) {
+        console.error(`err: ${err}`);
+      }
+    }
+    console.log(`results.length: ${results.length}`);
 
     // const compareResults = (a, b) => {
     //   const compareViewsCount = b.views.count - a.views.count;
@@ -137,7 +117,7 @@ const asyncWrapper = async () => {
     // });
   }
   catch (err) {
-    console.log(`err: ${err}`);
+    console.error(`err: ${err}`);
   }
 };
 

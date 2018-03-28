@@ -60,6 +60,29 @@ const GITHUB_WEB_CONFIG = {
   withCredentials: true
 };
 
+const addTableRow = result => {
+  const row = document.createElement("tr");
+  const td1 = document.createElement("td");
+  const td2 = document.createElement("td");
+  const td3 = document.createElement("td");
+  const td4 = document.createElement("td");
+  const td5 = document.createElement("td");
+  td1.innerText = result.repo.name;
+  td2.innerText = result.views.summary.total;
+  td3.innerText = result.views.summary.unique;
+  td4.innerText = result.clones.summary.total;
+  td5.innerText = result.clones.summary.unique;
+  row.appendChild(td1);
+  row.appendChild(td2);
+  row.appendChild(td3);
+  row.appendChild(td4);
+  row.appendChild(td5);
+  document.querySelector("tbody").appendChild(row);
+};
+
+const populateTable = results =>
+  results.forEach(addTableRow);
+
 const asyncWrapper = async () => {
   try {
     const login = await scrapeGitHubLogin();
@@ -112,20 +135,7 @@ const asyncWrapper = async () => {
       .filter(result => result.views.summary.total || result.clones.summary.total)
       .sort(compareResults);
 
-    const REPO_NAME_COL_WIDTH = 30;
-    const COUNT_COL_WIDTH = 5;
-
-    filteredSortedResults.forEach(result => {
-      const repoName = result.repo.name.padEnd(REPO_NAME_COL_WIDTH);
-      const viewsCount = String(result.views.summary.total).padStart(COUNT_COL_WIDTH);
-      const viewsUniques = String(result.views.summary.unique).padStart(COUNT_COL_WIDTH);
-      const clonesCount = String(result.clones.summary.total).padStart(COUNT_COL_WIDTH);
-      const clonesUniques = String(result.clones.summary.unique).padStart(COUNT_COL_WIDTH);
-      const viewsNumbers = `views: ${viewsCount} / ${viewsUniques}`;
-      const clonesNumbers = `clones: ${clonesCount} / ${clonesUniques}`;
-      const stars = `stars: ${result.repo.stargazers_count}`;
-      console.log(`${repoName}     ${viewsNumbers}     ${clonesNumbers}     ${stars}`);
-    });
+    populateTable(filteredSortedResults);
   }
   catch (err) {
     console.error(`err: ${err}`);

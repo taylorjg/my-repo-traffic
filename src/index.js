@@ -27,7 +27,19 @@ const getPages = async (url, config) => {
   }
 };
 
-const flatten = xs => [].concat(...xs);
+const range = n =>
+  Array.from(Array(n).keys());
+
+const flatten = xs =>
+  [].concat(...xs);
+
+const chunksOf = (n, xs) =>
+  range(Math.ceil(xs.length / n))
+    .map(i => [i * n, i * n + n])
+    .map(([start, end]) => xs.slice(start, end));
+
+const delay = ms =>
+  new Promise(resolve => setTimeout(resolve, ms));
 
 const scrapeGitHubLogin = async () => {
   const response = await axios.get("https://github.com");
@@ -56,65 +68,67 @@ const asyncWrapper = async () => {
     console.log(`login: ${login}`);
 
     const reposUrl = `https://api.github.com/users/${login}/repos`;
-    const repos = flatten(await getPages(reposUrl, GITHUB_API_CONFIG)).slice(0, 20);
+    const repos = flatten(await getPages(reposUrl, GITHUB_API_CONFIG));
     console.log(`repos.length: ${repos.length}`);
 
-    // const repo = repos[0];
-    // const viewsUrl = `https://github.com/${repo.full_name}/graphs/traffic-data`;
-    // const clonesUrl = `https://github.com/${repo.full_name}/graphs/clone-activity-data`;
-    // const viewsResponse = await axios.get(viewsUrl, GITHUB_WEB_CONFIG);
-    // const clonesResponse = await axios.get(clonesUrl, GITHUB_WEB_CONFIG);
-    // console.log(`views: ${JSON.stringify(viewsResponse.data, null, 2)}`);
-    // console.log(`clones: ${JSON.stringify(clonesResponse.data, null, 2)}`);
-
     const results = [];
-    for (let index = 0; index < repos.length; index++) {
-      try {
-        const repo = repos[index];
+
+    const BATCH_SIZE = 1;
+    const DELAY = 400;
+    const repoChunks = chunksOf(BATCH_SIZE, repos);
+
+    for (let i = 0; i < repoChunks.length; i++) {
+      const repoChunk = repoChunks[i];
+      const chunkPromises = [];
+      for (let j = 0; j < repoChunk.length; j++) {
+        const repo = repoChunk[j];
         const viewsUrl = `https://github.com/${repo.full_name}/graphs/traffic-data`;
         const clonesUrl = `https://github.com/${repo.full_name}/graphs/clone-activity-data`;
+        const repoPromise = Promise.resolve(repo);
         const viewsPromise = axios.get(viewsUrl, GITHUB_WEB_CONFIG);
         const clonesPromise = axios.get(clonesUrl, GITHUB_WEB_CONFIG);
-        const [{ data: views }, { data: clones }] = await Promise.all([viewsPromise, clonesPromise]);
-
+        const repoPromises = Promise.all([repoPromise, viewsPromise, clonesPromise]);
+        chunkPromises.push(repoPromises);
+      }
+      console.log(`waiting for chunk index ${i} of ${repoChunks.length}...`);
+      const chunkResponses = await Promise.all(chunkPromises);
+      chunkResponses.forEach(([repo, { data: views }, { data: clones }]) => {
         const result = {
           repo,
           views,
           clones
         };
-
         results.push(result);
-      }
-      catch (err) {
-        console.error(`err: ${err}`);
-      }
+      });
+      console.log(`delaying for ${DELAY}ms...`);
+      await delay(DELAY);
     }
     console.log(`results.length: ${results.length}`);
 
-    // const compareResults = (a, b) => {
-    //   const compareViewsCount = b.views.count - a.views.count;
-    //   const compareClonesCount = b.clones.count - a.clones.count;
-    //   return compareViewsCount ? compareViewsCount : compareClonesCount;
-    // };
+    const compareResults = (a, b) => {
+      const compareViewsCount = b.views.count - a.views.count;
+      const compareClonesCount = b.clones.count - a.clones.count;
+      return compareViewsCount ? compareViewsCount : compareClonesCount;
+    };
 
-    // const filteredSortedResults = results
-    //   .filter(result => result.views.count || result.clones.count)
-    //   .sort(compareResults);
+    const filteredSortedResults = results
+      .filter(result => result.views.summary.total || result.clones.summary.total)
+      .sort(compareResults);
 
-    // const REPO_NAME_COL_WIDTH = 30;
-    // const COUNT_COL_WIDTH = 5;
+    const REPO_NAME_COL_WIDTH = 30;
+    const COUNT_COL_WIDTH = 5;
 
-    // filteredSortedResults.forEach(result => {
-    //   const repoName = result.repo.name.padEnd(REPO_NAME_COL_WIDTH);
-    //   const viewsCount = String(result.views.count).padStart(COUNT_COL_WIDTH);
-    //   const viewsUniques = String(result.views.uniques).padStart(COUNT_COL_WIDTH);
-    //   const clonesCount = String(result.clones.count).padStart(COUNT_COL_WIDTH);
-    //   const clonesUniques = String(result.clones.uniques).padStart(COUNT_COL_WIDTH);
-    //   const viewsNumbers = `views: ${viewsCount} / ${viewsUniques}`;
-    //   const clonesNumbers = `clones: ${clonesCount} / ${clonesUniques}`;
-    //   const stars = `stars: ${result.repo.stargazers_count}`;
-    //   console.log(`${repoName}     ${viewsNumbers}     ${clonesNumbers}     ${stars}`);
-    // });
+    filteredSortedResults.forEach(result => {
+      const repoName = result.repo.name.padEnd(REPO_NAME_COL_WIDTH);
+      const viewsCount = String(result.views.summary.total).padStart(COUNT_COL_WIDTH);
+      const viewsUniques = String(result.views.summary.unique).padStart(COUNT_COL_WIDTH);
+      const clonesCount = String(result.clones.summary.total).padStart(COUNT_COL_WIDTH);
+      const clonesUniques = String(result.clones.summary.unique).padStart(COUNT_COL_WIDTH);
+      const viewsNumbers = `views: ${viewsCount} / ${viewsUniques}`;
+      const clonesNumbers = `clones: ${clonesCount} / ${clonesUniques}`;
+      const stars = `stars: ${result.repo.stargazers_count}`;
+      console.log(`${repoName}     ${viewsNumbers}     ${clonesNumbers}     ${stars}`);
+    });
   }
   catch (err) {
     console.error(`err: ${err}`);

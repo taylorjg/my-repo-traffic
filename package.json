@@ -10,7 +10,11 @@
     "babel-preset-env": "^1.6.1",
     "babel-register": "^6.26.0",
     "copy-webpack-plugin": "^4.5.1",
+    "css-loader": "^0.28.11",
     "eslint": "^4.16.0",
+    "vue": "^2.5.16",
+    "vue-loader": "^14.2.2",
+    "vue-template-compiler": "^2.5.16",
     "webpack": "^3.11.0"
   },
   "scripts": {

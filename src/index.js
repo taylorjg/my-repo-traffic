@@ -88,7 +88,7 @@ const asyncWrapper = async () => {
     const login = await scrapeGitHubLogin();
     console.log(`login: ${login}`);
 
-    const MAX_NUM_REPOS = 149;
+    const MAX_NUM_REPOS = 10; // 149;
 
     const reposUrl = `https://api.github.com/users/${login}/repos?sort=created&direction=desc`;
     const repos = flatten(await getPages(reposUrl, GITHUB_API_CONFIG)).slice(0, MAX_NUM_REPOS);

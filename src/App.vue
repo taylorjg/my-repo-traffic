@@ -9,6 +9,7 @@
                 <th>Views (Unique)</th>
                 <th>Clones (Total)</th>
                 <th>Clones (Unique)</th>
+                <th>Stars</th>
             </thead>
             <tbody>
               <tr v-for="result in results" :key="result.repo.id">
@@ -17,6 +18,7 @@
                 <td>{{ result.views.summary.unique }}</td>
                 <td>{{ result.clones.summary.total }}</td>
                 <td>{{ result.clones.summary.unique }}</td>
+                <td>{{ result.repo.stargazers_count }}</td>
               </tr>
             </tbody>
         </table>
